@@ -1,0 +1,24 @@
+{
+	"baseUrl": "http://date.jsontest.com/",
+	"username": "hello",
+	"password": "",
+	"parameterForAll": [
+	                    {"key": "q", "value": "testing"}, 
+	                    {"key": "key", "value": "AIzaSyDJ30YZYn-AzzOodZMdvAXur_1oPZ-keQw"}
+	                    ],
+	"parameterPerLine": [
+							[
+							 {"key": "param1", "value": "hello"}, 
+							 {"key": "param2", "value": "world"}
+							],
+							[
+							 {"key": "param1", "value": "this"}, 
+							 {"key": "param2", "value": "is"}, 
+							 {"key": "param3", "value": "test"}
+							],
+							[
+							 {"key": "something", "value": "for"}, 
+							 {"key": "action", "value": "testing"}
+							]
+						]
+}

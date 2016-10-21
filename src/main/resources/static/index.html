@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html ng-app="app" ng-cloak>
+<header>
+	<link rel="stylesheet"
+		href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"
+		integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u"
+		crossorigin="anonymous">
+	<link rel="stylesheet"
+		href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap-theme.min.css"
+		integrity="sha384-rHyoN1iRsVXV4nD0JutlnGaslCJuC7uwjduW9SVrLvRYooPp2bWYgmgJQIXwl/Sp"
+		crossorigin="anonymous">
+	<link rel="stylesheet"
+		href="https://cdn.rawgit.com/angular-ui/bower-ui-grid/master/ui-grid.min.css">
+	<script src="http://code.jquery.com/jquery-3.1.1.js"
+		integrity="sha256-16cdPddA6VdVInumRGo6IbivbERE8p7CQR3HzTBuELA="
+		crossorigin="anonymous"></script>
+	<script
+		src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"
+		integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa"
+		crossorigin="anonymous"></script>
+	<script
+		src="https://ajax.googleapis.com/ajax/libs/angularjs/1.5.8/angular.js"></script>
+		<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.20/pdfmake.min.js" integrity="sha256-WB9HSwpUgTxus6MHzdeOR5O+5+ofJHuZimoaF9RC2SA=" crossorigin="anonymous"></script>
+		<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.20/vfs_fonts.js" integrity="sha256-QLGLlSdokhcVcHQ0VVcs5A/V6jTBSBZjbm+oxae2V7M=" crossorigin="anonymous"></script>
+	<script
+		src="https://cdn.rawgit.com/angular-ui/bower-ui-grid/master/ui-grid.min.js"></script>
+	<script>
+var app = angular.module('app',['ui.grid', 'ui.grid.selection', 'ui.grid.exporter', 'ui.grid.autoResize', 'ui.grid.moveColumns', 'ui.grid.edit', 'ui.grid.cellNav']);
+app.controller('ctrl', function($scope, $http){
+	$scope.data = {};
+	$scope.data.parameterForAll = [];
+	$scope.data.parameterPerLine = [];
+	$scope.result = [];
+	
+	function loadData (){
+		if(!localStorage.getItem("jsonReportReader.data")){
+			$http.get('data.json')
+			.then(function(response){
+				$scope.data = response.data;
+				saveData();
+			});
+		} else {
+			$scope.data = JSON.parse(localStorage.getItem("jsonReportReader.data"));
+		}
+		
+	} loadData();
+
+	function saveData(){
+		localStorage.setItem("jsonReportReader.data", JSON.stringify($scope.data));
+	}
+	
+	$scope.getBaseUrl = function (){
+		var baseUrl = $scope.data.baseUrl + '?';
+		$scope.data.parameterForAll.forEach(function(paramForAll){
+			baseUrl += getParamString(paramForAll) + '&';
+		});
+		return baseUrl;
+	}
+
+	function getParamString(obj){
+		var paramString = obj.key + '=' + obj.value;
+		return paramString;
+	}
+
+	$scope.getLineParamString = function (line){
+		var url = '';
+		line.forEach(function(param){
+			url += getParamString(param) + '&';
+		});
+		return url;
+	}
+	
+	$scope.getAllResult = function(){
+		var resultUrl = [];
+		var baseUrl = $scope.getBaseUrl();
+		$scope.data.parameterPerLine.forEach(function(line){
+			var url = baseUrl + $scope.getLineParamString(line);
+			resultUrl.push(url.substring(0, url.length-1));
+		});
+		postResult(resultUrl);
+	}
+
+	$scope.getResult = function(line){
+		var resultUrl = [];
+		var url = $scope.getBaseUrl();
+		if(line) url += $scope.getLineParamString(line);
+		resultUrl.push(url.substring(0, url.length-1));
+		postResult(resultUrl);
+	}
+	
+	function postResult(resultUrl){
+		saveData();
+		var resultMap = {
+				credential:{
+					username: $scope.data.username, 
+					password: $scope.data.password
+				},
+				urls :  resultUrl
+		}
+		$http.post('getResult', resultMap)
+		.then(function(response){
+			$scope.result = [];
+			var updateColumn = false;
+			response.data.forEach(function(d){
+				var record = JSON.parse(d);
+				if(!updateColumn){
+					$scope.gridOptions.columnDefs = [];
+					for(var key in record){
+						$scope.gridOptions.columnDefs.push({field: key});
+					}
+				}
+				$scope.result.push(record);
+			});
+			$scope.gridOptions.data = $scope.result;
+		});
+	}
+	
+	$scope.add = function(f){
+	  var r = new FileReader();
+	  r.onloadend = function(e){
+		  $scope.data = JSON.parse(e.target.result);
+		  $scope.$apply();
+		  saveData();
+	    f.value = null;
+	  }
+	  r.readAsBinaryString(f.files[0]);
+	}
+
+	$scope.addLine = function(){
+		var newLine = [];
+		$scope.addAttribute(newLine);
+		$scope.data.parameterPerLine.push(newLine);
+	}
+	
+	$scope.gridOptions = {
+		    enableGridMenu: true,
+		    enableSelectAll: true,
+		    enableCellEditOnFocus: true,
+		    enableRowSelection: true,
+		    enableFiltering: true,
+		    exporterCsvFilename: 'myFile.csv',
+		    exporterPdfOrientation: 'portrait',
+		    exporterPdfPageSize: 'LETTER',
+		    exporterPdfMaxGridWidth: 500,
+		    columnDefs: [{field: "test"}],
+		    onRegisterApi: function(gridApi){
+		      $scope.gridApi = gridApi;
+		    }
+		  };
+
+	  $scope.deleteAttribute = function(objList, idx, parentObj){
+		  objList.splice(idx, 1);
+		  if(objList.length === 0 && parentObj) {
+			  $scope.deleteAttribute(parentObj, parentObj.indexOf(objList));
+		  };
+	  }
+
+	  $scope.addAttribute = function(parentObj){
+			parentObj.push({key : 'key', value :'value'})
+	  }
+
+	  $scope.updateKey = function (objList, item, oldKey, newKey){
+		  console.log(newKey);
+	  }
+
+})
+</script>
+	<style>
+.textbox {
+	width: 100% !important;
+	margin: 10px;
+}
+</style>
+</header>
+<body ng-controller="ctrl">
+
+	<nav class="navbar navbar-dark bg-primary navbar-static-top">
+		<div class="container-fluid">
+			<div class="nav-header"></div>
+			<form name="form" class="navbar-form navbar-left">
+				<div class="form-group">
+					<input type="url" class="form-control" id="baseUrl"
+						title="Base URL" ng-model="data.baseUrl" placeholder="Base URL">
+				</div>
+				<div class="form-group">
+					<input type="text" class="form-control" min-width="500px"
+						title="User" id="username" ng-model="data.username"
+						placeholder="User">
+				</div>
+				<div class="form-group">
+					<input type="password" class="form-control" id="password"
+						title="Password" ng-model="data.password" placeholder="password">
+				</div>
+
+				<label class="btn btn-success" ng-click="data.parameterPerLine.length > 0 && getAllResult()" ng-disabled="data.parameterPerLine.length === 0"> [ Get All Result ] </label> 
+					<label class="btn btn-warning"> <i
+						class="glyphicon glyphicon-upload"></i> Input File <input
+						style="display: none;" class="form-control file-loading"
+						type="file" name="file" ng-model="data.file"
+						onChange="angular.element(this).scope().add(form.file)"
+						accept=".json" />
+					</label>
+					 <div class="checkbox">
+					    <label>
+					      <input type="checkbox" ng-model="showDataJson"> Show Data
+					    </label>
+					  </div>
+			</form>
+		</div>
+	</nav>
+
+	<div class="panel-group" id="accordion" role="tablist"
+		aria-multiselectable="true">
+		
+		<div class="panel panel-primary" ng-if="showDataJson">
+			<div class="panel-heading" role="tab" id="headingOne">
+				<h4 class="panel-title">
+					<a role="button" data-toggle="collapse"
+						data-parent="#accordion" href="#collapseOne" aria-expanded="true"
+						aria-controls="collapseOne">Data </a>
+				</h4>
+			</div>
+			<div id="collapseOne" class="panel-collapse collapse in" role="tabpanel"
+				aria-labelledby="headingOne">
+				<div class="panel-body">
+					<pre>{{data | json}}</pre>
+				</div>
+			</div>
+		</div>
+		
+		<div class="panel panel-primary">
+			<div class="panel-heading" role="tab" id="headingTwo">
+				<h4 class="panel-title">
+					<a class="collapsed" role="button" data-toggle="collapse"
+						data-parent="#accordion" href="#collapseTwo" aria-expanded="false"
+						aria-controls="collapseTwo"> Parameters for all </a>
+				</h4>
+			</div>
+			<div id="collapseTwo" class="panel-collapse collapse" role="tabpanel"
+				aria-labelledby="headingTwo">
+				<div class="panel-body">
+					<div class="well"><label class="btn btn-success" ng-click="getResult()">[ Get Result ]</label> {{getBaseUrl()}}</div>				
+					<span ng-repeat="param in data.parameterForAll" class="col-md-6">
+						<p>
+						<input type="text" ng-model="param['key']">  : <input type="text" ng-model="param['value']"> 
+						<label class="btn btn-danger" ng-click="deleteAttribute(data.parameterForAll, $index)">[ - ]</label>
+						</p>
+					</span>
+					<div class="col-md-12"><label class="btn btn-success" ng-click="addAttribute(data.parameterForAll)">[ + Parameters for all ]</label></div> 
+				</div>
+			</div>
+		</div>
+		
+		<div class="panel panel-primary">
+			<div class="panel-heading" role="tab" id="headingThree">
+				<h4 class="panel-title">
+					<a class="collapsed" role="button" data-toggle="collapse"
+						data-parent="#accordion" href="#collapseThree"
+						aria-expanded="true" aria-controls="collapseThree"> Parameters pre line </a>
+				</h4>
+			</div>
+			<div id="collapseThree" class="panel-collapse collapse"
+				role="tabpanel" aria-labelledby="headingThree">
+				<div class="panel-body">
+				<label ng-if="data.parameterPerLine.length === 0" class="btn btn-success" ng-click="addLine()">[ + Line ]</label> 
+					<div class="col-md-12" ng-repeat="line in data.parameterPerLine">
+						<fieldset>
+							<legend class="small">
+							<p>
+							Line {{$index}}
+							</p> 
+							<div class="well"><label class="btn btn-success" ng-click="getResult(line)"> [ Get Result ] </label> {{getBaseUrl() + getLineParamString(line)}}</div>
+							</legend>
+							<p>
+							<label class="btn btn-success" ng-click="addLine()">[ + Line ]</label> 
+							<label class="btn btn-danger" ng-click="deleteAttribute(data.parameterPerLine, $index)">[ - Line ]</label></p> 
+							<span ng-repeat="param in line" class="textbox" class="col-md-6">
+								<p>
+									<input type="text" ng-model="param['key']"> : <input type="text" ng-model="param['value']"> 
+									<label class="btn btn-danger" ng-click="deleteAttribute(line, $index, data.parameterPerLine)">[ - ]</label>
+								</p>
+							</span>
+						</fieldset>
+						<label class="btn btn-success" ng-click="addAttribute(line)">[ + Parameter ]</label> 
+						<hr>
+					</div>
+				</div>
+			</div>
+		</div>
+		
+		<div class="panel panel-primary">
+			<div class="panel-heading" id="headingFour">
+				<h4 class="panel-title">
+					Result
+				</h4>
+			</div>
+				<div class="panel-body">
+					<div id="grid" ui-grid="gridOptions" class="grid" ui-grid-selection
+						ui-grid-exporter ui-grid-auto-resize ui-grid-moveColumns ui-grid-edit ui-grid-cellNav></div>
+				</div>
+		</div>
+		
+	</div>
+</body>
+</html>
